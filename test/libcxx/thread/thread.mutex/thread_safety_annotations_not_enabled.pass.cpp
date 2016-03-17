@@ -9,23 +9,16 @@
 
 // <mutex>
 
-// template <class Mutex> class unique_lock;
-
-// unique_lock(unique_lock const&) = delete;
+// This test does not define _LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS so it
+// should compile without any warnings or errors even though this pattern is not
+// understood by the thread safety annotations.
 
 #include <mutex>
-#include <cassert>
 
-int main()
-{
-    {
-    typedef std::mutex M;
-    M m;
-    std::unique_lock<M> lk0(m);
-    std::unique_lock<M> lk = lk0;
-    assert(lk.mutex() == &m);
-    assert(lk.owns_lock() == true);
-    assert(lk0.mutex() == nullptr);
-    assert(lk0.owns_lock() == false);
-    }
+int main() {
+  std::mutex m;
+  m.lock();
+  {
+    std::unique_lock<std::mutex> g(m, std::adopt_lock);
+  }
 }

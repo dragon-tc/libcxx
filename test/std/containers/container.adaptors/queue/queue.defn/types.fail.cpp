@@ -7,25 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <mutex>
+// <queue>
 
-// template <class Mutex> class unique_lock;
-
-// unique_lock(unique_lock const&) = delete;
-
-#include <mutex>
+#include <queue>
 #include <cassert>
+#include <type_traits>
 
 int main()
 {
-    {
-    typedef std::mutex M;
-    M m;
-    std::unique_lock<M> lk0(m);
-    std::unique_lock<M> lk = lk0;
-    assert(lk.mutex() == &m);
-    assert(lk.owns_lock() == true);
-    assert(lk0.mutex() == nullptr);
-    assert(lk0.owns_lock() == false);
-    }
+//  LWG#2566 says that the first template param must match the second one's value type
+	std::queue<double, std::deque<int>> t;
 }
