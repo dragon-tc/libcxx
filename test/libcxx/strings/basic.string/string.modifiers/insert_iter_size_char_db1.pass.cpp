@@ -7,16 +7,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <vector>
+// <string>
 
-// vector<const int> v;  // an extension
+// iterator insert(const_iterator p, size_type n, charT c);
 
-#include <vector>
-#include <type_traits>
+#if _LIBCPP_DEBUG >= 1
+#define _LIBCPP_ASSERT(x, m) ((x) ? (void)0 : std::exit(0))
+#endif
+
+#include <string>
+#include <cassert>
 
 int main()
 {
-#ifndef _LIBCPP_HAS_NO_GENERALIZED_INITIALIZERS
-    std::vector<const int> v = {1, 2, 3};
+#if _LIBCPP_DEBUG >= 1
+    {
+        std::string s;
+        std::string s2;
+        s.insert(s2.begin(), 1, 'a');
+        assert(false);
+    }
 #endif
 }

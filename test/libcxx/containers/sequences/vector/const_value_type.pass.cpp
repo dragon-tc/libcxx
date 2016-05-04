@@ -6,20 +6,17 @@
 // Source Licenses. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-//
-// UNSUPPORTED: libcpp-has-no-threads
 
-// <atomic>
+// UNSUPPORTED: c++98, c++03
 
-// struct atomic_flag
+// <vector>
 
-// TESTING EXTENSION atomic_flag(bool)
+// vector<const int> v;  // an extension
 
-#include <atomic>
-#include <cassert>
+#include <vector>
+#include <type_traits>
 
 int main()
 {
-    std::atomic_flag f(false);
-    assert(f.test_and_set() == 0);
+    std::vector<const int> v = {1, 2, 3};
 }
