@@ -7,17 +7,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++98, c++03, c++11
+// <strstream>
 
-#include <tuple>
+// class strstreambuf
+
+// int overflow(int c);
+
+#include <iostream>
 #include <string>
-#include <complex>
+#include <strstream>
 
-#include <cassert>
+int main() {
+  std::ostrstream oss;
+  std::string s;
 
-int main()
-{
-    typedef std::complex<float> cf;
-    auto t1 = std::make_tuple<double, int, std::string, cf, int> ( 42, 21, "Hi", { 1,2 } );
-    assert ( std::get<int>(t1) == 42 ); // two ints here (one at the end)
+  for (int i = 0; i < 4096; ++i)
+    s.push_back((i % 16) + 'a');
+
+  oss << s << std::ends;
+  std::cout << oss.str();
+  oss.freeze(false);
+
+  return 0;
 }
