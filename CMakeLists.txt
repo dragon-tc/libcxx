@@ -34,7 +34,7 @@ endif()
 if (LIBCXX_STANDALONE_BUILD AND NOT LLVM_FOUND)
   message(WARNING "UNSUPPORTED LIBCXX CONFIGURATION DETECTED: "
                   "llvm-config not found and LLVM_PATH not defined.\n"
-                  "Reconfigure with -DLLVM_CONFIG=path/to/llvm-config "
+                  "Reconfigure with -DLLVM_CONFIG_PATH=path/to/llvm-config "
                   "or -DLLVM_PATH=path/to/llvm-source-root.")
 endif()
 
@@ -48,6 +48,7 @@ MACRO_ENSURE_OUT_OF_SOURCE_BUILD(
 #===============================================================================
 # Setup CMake Options
 #===============================================================================
+include(CMakeDependentOption)
 
 # Basic options ---------------------------------------------------------------
 option(LIBCXX_ENABLE_ASSERTIONS "Enable assertions independent of build mode." ON)
@@ -57,7 +58,7 @@ option(LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY "Build libc++experimental.a" ON)
 option(LIBCXX_ENABLE_FILESYSTEM
         "Build filesystem as part of libc++experimental.a" ${LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY})
 option(LIBCXX_INCLUDE_TESTS "Build the libc++ tests." ${LLVM_INCLUDE_TESTS})
-option(LIBCXX_INCLUDE_BENCHMARKS "Build the libc++ benchmarks and their dependancies" OFF)
+option(LIBCXX_INCLUDE_BENCHMARKS "Build the libc++ benchmarks and their dependancies" ON)
 option(LIBCXX_BUILD_BENCHMARK_NATIVE_STDLIB "Build the benchmarks against the native STL" OFF)
 option(LIBCXX_INCLUDE_DOCS "Build the libc++ documentation." ${LLVM_INCLUDE_DOCS})
 set(LIBCXX_LIBDIR_SUFFIX "${LLVM_LIBDIR_SUFFIX}" CACHE STRING
@@ -65,9 +66,12 @@ set(LIBCXX_LIBDIR_SUFFIX "${LLVM_LIBDIR_SUFFIX}" CACHE STRING
 option(LIBCXX_INSTALL_HEADERS "Install the libc++ headers." ON)
 option(LIBCXX_INSTALL_LIBRARY "Install the libc++ library." ON)
 option(LIBCXX_INSTALL_SUPPORT_HEADERS "Install libc++ support headers." ON)
-option(LIBCXX_INSTALL_EXPERIMENTAL_LIBRARY "Install libc++experimental.a" OFF)
+cmake_dependent_option(LIBCXX_INSTALL_EXPERIMENTAL_LIBRARY
+        "Install libc++experimental.a" ON
+        "LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY;LIBCXX_INSTALL_LIBRARY" OFF)
 set(LIBCXX_ABI_VERSION 1 CACHE STRING "ABI version of libc++.")
 option(LIBCXX_ABI_UNSTABLE "Unstable ABI of libc++." OFF)
+option(LIBCXX_USE_COMPILER_RT "Use compiler-rt instead of libgcc" OFF)
 
 if (NOT LIBCXX_ENABLE_SHARED AND NOT LIBCXX_ENABLE_STATIC)
   message(FATAL_ERROR "libc++ must be built as either a shared or static library.")
@@ -136,6 +140,9 @@ option(LIBCXX_ENABLE_MONOTONIC_CLOCK
    This option may only be set to OFF when LIBCXX_ENABLE_THREADS=OFF." ON)
 option(LIBCXX_HAS_MUSL_LIBC "Build libc++ with support for the Musl C library" OFF)
 option(LIBCXX_HAS_PTHREAD_API "Ignore auto-detection and force use of pthread API" OFF)
+option(LIBCXX_HAS_EXTERNAL_THREAD_API
+  "Build libc++ with an externalized threading API.
+   This option may only be set to ON when LIBCXX_ENABLE_THREADS=ON." OFF)
 
 # Misc options ----------------------------------------------------------------
 # FIXME: Turn -pedantic back ON. It is currently off because it warns
@@ -190,6 +197,11 @@ endif()
 
 if(LIBCXX_HAS_PTHREAD_API AND NOT LIBCXX_ENABLE_THREADS)
   message(FATAL_ERROR "LIBCXX_HAS_PTHREAD_API can only be set to ON"
+                      " when LIBCXX_ENABLE_THREADS is also set to ON.")
+endif()
+
+if(LIBCXX_HAS_EXTERNAL_THREAD_API AND NOT LIBCXX_ENABLE_THREADS)
+  message(FATAL_ERROR "LIBCXX_HAS_EXTERNAL_THREAD_API can only be set to ON"
                       " when LIBCXX_ENABLE_THREADS is also set to ON.")
 endif()
 
@@ -258,9 +270,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBCXX_LIBRARY_DIR})
 # LIBCXX_CXX_FLAGS: General flags for both the compiler and linker.
 # LIBCXX_COMPILE_FLAGS: Compile only flags.
 # LIBCXX_LINK_FLAGS: Linker only flags.
+# LIBCXX_LIBRARIES: libraries libc++ is linked to.
+# LIBCXX_INTERFACE_LIBRARIES: Libraries that must be linked when using libc++
+#                             There libraries are exposed in the linker script.
 set(LIBCXX_COMPILE_FLAGS "")
 set(LIBCXX_LINK_FLAGS "")
 set(LIBCXX_LIBRARIES "")
+set(LIBCXX_INTERFACE_LIBRARIES "")
 
 # Include macros for adding and removing libc++ flags.
 include(HandleLibcxxFlags)
@@ -277,6 +293,10 @@ add_target_flags_if(LIBCXX_GCC_TOOLCHAIN "-gcc-toolchain ${LIBCXX_GCC_TOOLCHAIN}
 # Configure compiler.
 include(config-ix)
 
+if (LIBCXX_USE_COMPILER_RT)
+  list(APPEND LIBCXX_LINK_FLAGS "-rtlib=compiler-rt")
+endif()
+
 # Configure coverage options.
 if (LIBCXX_GENERATE_COVERAGE)
   include(CodeCoverage)
@@ -291,9 +311,12 @@ string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
 
 include(HandleLibCXXABI) # Setup the ABI library flags
 
-# Remove flags that may have snuck in.
-remove_flags(-DNDEBUG -UNDEBUG -D_DEBUG
-             -stdlib=libc++ -stdlib=libstdc++ -lc++abi -m32)
+if (NOT LIBCXX_STANDALONE_BUILD)
+  # Remove flags that may have snuck in.
+  remove_flags(-DNDEBUG -UNDEBUG -D_DEBUG
+               -lc++abi -m32)
+endif()
+remove_flags(-stdlib=libc++ -stdlib=libstdc++)
 
 # FIXME(EricWF): See the FIXME on LIBCXX_ENABLE_PEDANTIC.
 # Remove the -pedantic flag and -Wno-pedantic and -pedantic-errors
@@ -314,13 +337,25 @@ endif()
 # headers
 add_compile_flags_if_supported(-nostdinc++)
 
+# Let the library headers know they are currently being used to build the
+# library.
+add_definitions(-D_LIBCPP_BUILDING_LIBRARY)
+
 # Warning flags ===============================================================
 add_definitions(-D_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 add_compile_flags_if_supported(
-    -Wall -W -Wwrite-strings
-    -Wno-unused-parameter -Wno-long-long -Wno-user-defined-literals
-    -Wno-covered-switch-default
+    -Wall -Wextra -W -Wwrite-strings
+    -Wno-unused-parameter -Wno-long-long
     -Werror=return-type)
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    add_compile_flags_if_supported(
+        -Wno-user-defined-literals
+        -Wno-covered-switch-default)
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+    add_compile_flags_if_supported(
+        -Wno-literal-suffix
+        -Wno-c++14-compat)
+endif()
 if (LIBCXX_ENABLE_WERROR)
   add_compile_flags_if_supported(-Werror)
   add_compile_flags_if_supported(-WX)
@@ -352,6 +387,17 @@ if (NOT LIBCXX_ENABLE_RTTI)
   add_definitions(-D_LIBCPP_NO_RTTI)
   add_compile_flags_if_supported(-GR-)
   add_compile_flags_if_supported(-fno-rtti)
+endif()
+
+# Threading flags =============================================================
+if (LIBCXX_HAS_EXTERNAL_THREAD_API AND LIBCXX_ENABLE_SHARED)
+  # Need to allow unresolved symbols if this is to work with shared library builds
+  if (APPLE)
+    add_link_flags("-undefined dynamic_lookup")
+  else()
+    # Relax this restriction from HandleLLVMOptions
+    string(REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+  endif()
 endif()
 
 # Assertion flags =============================================================
@@ -415,7 +461,16 @@ config_define_if_not(LIBCXX_ENABLE_MONOTONIC_CLOCK _LIBCPP_HAS_NO_MONOTONIC_CLOC
 config_define_if_not(LIBCXX_ENABLE_THREAD_UNSAFE_C_FUNCTIONS _LIBCPP_HAS_NO_THREAD_UNSAFE_C_FUNCTIONS)
 
 config_define_if(LIBCXX_HAS_PTHREAD_API _LIBCPP_HAS_THREAD_API_PTHREAD)
+config_define_if(LIBCXX_HAS_EXTERNAL_THREAD_API _LIBCPP_HAS_THREAD_API_EXTERNAL)
 config_define_if(LIBCXX_HAS_MUSL_LIBC _LIBCPP_HAS_MUSL_LIBC)
+
+# By default libc++ on Windows expects to use a shared library, which requires
+# the headers to use DLL import/export semantics. However when building a
+# static library only we modify the headers to disable DLL import/export.
+if (DEFINED WIN32 AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
+  message(STATUS "Generating custom __config for non-DLL Windows build")
+  config_define(ON _LIBCPP_DISABLE_DLL_IMPORT_EXPORT)
+endif()
 
 if (LIBCXX_NEEDS_SITE_CONFIG)
   configure_file(

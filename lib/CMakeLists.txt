@@ -33,15 +33,30 @@ add_link_flags_if(LIBCXX_CXX_ABI_LIBRARY_PATH "-L${LIBCXX_CXX_ABI_LIBRARY_PATH}"
 
 add_library_flags_if(LIBCXX_COVERAGE_LIBRARY "${LIBCXX_COVERAGE_LIBRARY}")
 
-add_library_flags_if(LIBCXX_ENABLE_STATIC_ABI_LIBRARY "-Wl,--whole-archive" "-Wl,-Bstatic")
-add_library_flags("${LIBCXX_CXX_ABI_LIBRARY}")
-add_library_flags_if(LIBCXX_ENABLE_STATIC_ABI_LIBRARY "-Wl,-Bdynamic" "-Wl,--no-whole-archive")
+if (APPLE AND (LIBCXX_CXX_ABI_LIBNAME STREQUAL "libcxxabi" OR
+               LIBCXX_CXX_ABI_LIBNAME STREQUAL "none"))
+  set(LIBCXX_OSX_REEXPORT_SYSTEM_ABI_LIBRARY ON)
+endif()
+
+if (LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
+  add_library_flags("-Wl,--whole-archive" "-Wl,-Bstatic")
+  add_library_flags("${LIBCXX_CXX_ABI_LIBRARY}")
+  add_library_flags("-Wl,-Bdynamic" "-Wl,--no-whole-archive")
+elseif (LIBCXX_OSX_REEXPORT_SYSTEM_ABI_LIBRARY)
+  add_library_flags("${LIBCXX_CXX_ABI_LIBRARY}")
+else ()
+ add_interface_library("${LIBCXX_CXX_ABI_LIBRARY}")
+endif()
 
 if (APPLE AND LLVM_USE_SANITIZER)
-  if ("${LLVM_USE_SANITIZER}" STREQUAL "Address")
+  if (("${LLVM_USE_SANITIZER}" STREQUAL "Address") OR
+      ("${LLVM_USE_SANITIZER}" STREQUAL "Address;Undefined") OR
+      ("${LLVM_USE_SANITIZER}" STREQUAL "Undefined;Address"))
     set(LIBFILE "libclang_rt.asan_osx_dynamic.dylib")
   elseif("${LLVM_USE_SANITIZER}" STREQUAL "Undefined")
     set(LIBFILE "libclang_rt.ubsan_osx_dynamic.dylib")
+  elseif("${LLVM_USE_SANITIZER}" STREQUAL "Thread")
+    set(LIBFILE "libclang_rt.tsan_osx_dynamic.dylib")
   else()
     message(WARNING "LLVM_USE_SANITIZER=${LLVM_USE_SANITIZER} is not supported on OS X")
   endif()
@@ -63,7 +78,7 @@ if (APPLE AND LLVM_USE_SANITIZER)
   endif()
 endif()
 
-# Generate library list.
+# Generate private library list.
 add_library_flags_if(LIBCXX_HAS_PTHREAD_LIB pthread)
 add_library_flags_if(LIBCXX_HAS_C_LIB c)
 add_library_flags_if(LIBCXX_HAS_M_LIB m)
@@ -71,12 +86,24 @@ add_library_flags_if(LIBCXX_HAS_RT_LIB rt)
 add_library_flags_if(LIBCXX_HAS_GCC_S_LIB gcc_s)
 add_library_flags_if(LIBCXX_HAVE_CXX_ATOMICS_WITH_LIB atomic)
 
+# Add the unwinder library.
+if (LIBCXXABI_USE_LLVM_UNWINDER)
+  if (TARGET unwind_shared)
+    add_interface_library(unwind_shared)
+  elseif (TARGET unwind_static)
+    add_interface_library(unwind_static)
+  else()
+    add_interface_library(unwind)
+  endif()
+endif()
+
 # Setup flags.
-add_flags_if_supported(-fPIC)
+if (NOT WIN32)
+  add_flags_if_supported(-fPIC)
+endif()
 add_link_flags_if_supported(-nodefaultlibs)
 
-if ( APPLE AND (LIBCXX_CXX_ABI_LIBNAME STREQUAL "libcxxabi" OR
-                LIBCXX_CXX_ABI_LIBNAME STREQUAL "none"))
+if (LIBCXX_OSX_REEXPORT_SYSTEM_ABI_LIBRARY)
   if (NOT DEFINED LIBCXX_LIBCPPABI_VERSION)
     set(LIBCXX_LIBCPPABI_VERSION "2") # Default value
     execute_process(
@@ -105,9 +132,9 @@ if ( APPLE AND (LIBCXX_CXX_ABI_LIBNAME STREQUAL "libcxxabi" OR
       "-Wl,-unexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/libc++unexp.exp"
       "/usr/lib/libSystem.B.dylib")
   else()
-    if ( ${CMAKE_OSX_SYSROOT} )
-      list(FIND ${CMAKE_OSX_ARCHITECTURES} "armv7" OSX_HAS_ARMV7)
-      if (OSX_HAS_ARMV7)
+    if (DEFINED CMAKE_OSX_SYSROOT)
+      list(FIND CMAKE_OSX_ARCHITECTURES "armv7" OSX_HAS_ARMV7)
+      if (NOT OSX_HAS_ARMV7 EQUAL -1)
         set(OSX_RE_EXPORT_LINE
           "${CMAKE_OSX_SYSROOT}/usr/lib/libc++abi.dylib"
           "-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/libc++sjlj-abi.exp")
@@ -199,15 +226,38 @@ if (LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY)
   )
 endif()
 
+if (LIBCXX_HAS_EXTERNAL_THREAD_API)
+  file(GLOB LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES ../test/support/external_threads.cpp)
+
+  if (LIBCXX_ENABLE_SHARED)
+    add_library(cxx_external_threads SHARED ${LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES})
+  else()
+    add_library(cxx_external_threads STATIC ${LIBCXX_EXTERNAL_THREADING_SUPPORT_SOURCES})
+  endif()
+
+  set_target_properties(cxx_external_threads
+    PROPERTIES
+      LINK_FLAGS    "${LIBCXX_LINK_FLAGS}"
+      COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
+      OUTPUT_NAME   "c++external_threads"
+  )
+endif()
+
 # Generate a linker script inplace of a libc++.so symlink. Rerun this command
 # after cxx builds.
 if (LIBCXX_ENABLE_SHARED AND LIBCXX_ENABLE_ABI_LINKER_SCRIPT)
   # Get the name of the ABI library and handle the case where CXXABI_LIBNAME
   # is a target name and not a library. Ex cxxabi_shared.
-  set(SCRIPT_ABI_LIBNAME "${LIBCXX_CXX_ABI_LIBRARY}")
-  if (SCRIPT_ABI_LIBNAME STREQUAL "cxxabi_shared")
-    set(SCRIPT_ABI_LIBNAME "c++abi")
-  endif()
+  set(LIBCXX_INTERFACE_LIBRARY_NAMES)
+  foreach(lib ${LIBCXX_INTERFACE_LIBRARIES})
+    # FIXME: Handle cxxabi_static and unwind_static.
+    if (TARGET ${lib})
+      list(APPEND LIBCXX_INTERFACE_LIBRARY_NAMES "$<TARGET_PROPERTY:${lib},OUTPUT_NAME>")
+    else()
+      list(APPEND LIBCXX_INTERFACE_LIBRARY_NAMES "${lib}")
+    endif()
+  endforeach()
+  #split_list(LIBCXX_INTERFACE_LIBRARY_NAMES)
   # Generate a linker script inplace of a libc++.so symlink. Rerun this command
   # after cxx builds.
   add_custom_command(TARGET cxx_shared POST_BUILD
@@ -215,7 +265,7 @@ if (LIBCXX_ENABLE_SHARED AND LIBCXX_ENABLE_ABI_LINKER_SCRIPT)
       ${PYTHON_EXECUTABLE} ${LIBCXX_SOURCE_DIR}/utils/gen_link_script/gen_link_script.py
     ARGS
       "$<TARGET_LINKER_FILE:cxx_shared>"
-      "${SCRIPT_ABI_LIBNAME}"
+      ${LIBCXX_INTERFACE_LIBRARY_NAMES}
     WORKING_DIRECTORY ${LIBCXX_BUILD_DIR}
   )
 endif()
@@ -225,8 +275,8 @@ if (LIBCXX_INSTALL_LIBRARY)
     set(experimental_lib cxx_experimental)
   endif()
   install(TARGETS ${LIBCXX_TARGETS} ${experimental_lib}
-    LIBRARY DESTINATION lib${LIBCXX_LIBDIR_SUFFIX} COMPONENT libcxx
-    ARCHIVE DESTINATION lib${LIBCXX_LIBDIR_SUFFIX} COMPONENT libcxx
+    LIBRARY DESTINATION lib${LIBCXX_LIBDIR_SUFFIX} COMPONENT cxx
+    ARCHIVE DESTINATION lib${LIBCXX_LIBDIR_SUFFIX} COMPONENT cxx
     )
   # NOTE: This install command must go after the cxx install command otherwise
   # it will not be executed after the library symlinks are installed.
@@ -248,13 +298,14 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND (LIBCXX_INSTALL_LIBRARY OR
       set(experimental_lib_install_target cxx_experimental)
     endif()
     if(LIBCXX_INSTALL_HEADERS)
-      set(header_install_target install-libcxx-headers)
+      set(header_install_target install-cxx-headers)
     endif()
-    add_custom_target(install-libcxx
+    add_custom_target(install-cxx
                       DEPENDS ${lib_install_target}
                               ${experimental_lib_install_target}
                               ${header_install_target}
                       COMMAND "${CMAKE_COMMAND}"
-                      -DCMAKE_INSTALL_COMPONENT=libcxx
+                      -DCMAKE_INSTALL_COMPONENT=cxx
                       -P "${LIBCXX_BINARY_DIR}/cmake_install.cmake")
+    add_custom_target(install-libcxx DEPENDS install-cxx)
 endif()

@@ -22,6 +22,12 @@
 #define TEST_HAS_FEATURE(X) 0
 #endif
 
+#ifdef __has_include
+#define TEST_HAS_INCLUDE(X) __has_include(X)
+#else
+#define TEST_HAS_INCLUDE(X) 0
+#endif
+
 #ifdef __has_extension
 #define TEST_HAS_EXTENSION(X) __has_extension(X)
 #else
@@ -60,6 +66,13 @@
 #else
 # define TEST_STD_VER 16    // current year; greater than current standard
 #endif
+#endif
+
+// Attempt to deduce GCC version
+#if defined(_LIBCPP_VERSION) && TEST_HAS_INCLUDE(<features.h>)
+#include <features.h>
+#define TEST_HAS_GLIBC
+#define TEST_GLIBC_PREREQ(major, minor) __GLIBC_PREREQ(major, minor)
 #endif
 
 /* Features that were introduced in C++14 */
@@ -111,9 +124,11 @@
 #if defined(_LIBCPP_VERSION)
 #define LIBCPP_ASSERT(...) assert(__VA_ARGS__)
 #define LIBCPP_STATIC_ASSERT(...) static_assert(__VA_ARGS__)
+#define LIBCPP_ONLY(...) __VA_ARGS__
 #else
 #define LIBCPP_ASSERT(...) ((void)0)
 #define LIBCPP_STATIC_ASSERT(...) ((void)0)
+#define LIBCPP_ONLY(...) ((void)0)
 #endif
 
 #define ASSERT_NOEXCEPT(...) \
@@ -132,5 +147,16 @@ struct is_same<T, T> { enum {value = 1}; };
 #define ASSERT_SAME_TYPE(...) \
     static_assert(test_macros_detail::is_same<__VA_ARGS__>::value, \
                  "Types differ uexpectedly")
+
+#ifndef TEST_HAS_NO_EXCEPTIONS
+#define TEST_THROW(...) throw __VA_ARGS__
+#else
+#if defined(__GNUC__)
+#define TEST_THROW(...) __builtin_abort()
+#else
+#include <stdlib.h>
+#define TEST_THROW(...) ::abort()
+#endif
+#endif
 
 #endif // SUPPORT_TEST_MACROS_HPP

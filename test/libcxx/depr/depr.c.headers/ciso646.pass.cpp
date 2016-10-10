@@ -7,19 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// test forward
+// <ciso646>
 
-#include <utility>
+#include <ciso646>
 
-struct A
-{
-};
-
-A source() {return A();}
-const A csource() {return A();}
+#ifndef _LIBCPP_VERSION
+#error _LIBCPP_VERSION not defined
+#endif
 
 int main()
 {
-    const A ca = A();
-    std::forward<A&>(ca);  // error
 }

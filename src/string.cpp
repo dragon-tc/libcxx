@@ -20,14 +20,37 @@
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-template class __basic_string_common<true>;
+template class _LIBCPP_CLASS_TEMPLATE_INSTANTIATION_VIS __basic_string_common<true>;
 
-template class basic_string<char>;
-template class basic_string<wchar_t>;
+template class _LIBCPP_CLASS_TEMPLATE_INSTANTIATION_VIS basic_string<char>;
+template class _LIBCPP_CLASS_TEMPLATE_INSTANTIATION_VIS basic_string<wchar_t>;
 
 template
     string
     operator+<char, char_traits<char>, allocator<char> >(char const*, string const&);
+
+// These external instantiations are required to maintain dylib compatibility
+// for ABI v1 when using __attribute__((internal_linkage)) as opposed to
+// __attribute__((visibility("hidden"), always_inline)).
+#if _LIBCPP_ABI_EXTERN_TEMPLATE_SYMBOLS_VERSION == 1
+template basic_string<char>::iterator
+basic_string<char>::insert(basic_string<char>::const_iterator,
+                           char const *, char const *);
+
+template basic_string<wchar_t>::iterator
+basic_string<wchar_t>::insert(basic_string<wchar_t>::const_iterator,
+                              wchar_t const *, wchar_t const *);
+
+template basic_string<char> &
+basic_string<char>::replace(basic_string<char>::const_iterator,
+                               basic_string<char>::const_iterator,
+                               char const *, char const *);
+
+template basic_string<wchar_t> &
+basic_string<wchar_t>::replace(basic_string<wchar_t>::const_iterator,
+                               basic_string<wchar_t>::const_iterator,
+                               wchar_t const *, wchar_t const *);
+#endif // _LIBCPP_ABI_EXTERN_TEMPLATE_SYMBOLS_VERSION
 
 namespace
 {
@@ -40,7 +63,7 @@ void throw_helper( const string& msg )
     throw T( msg );
 #else
     fprintf(stderr, "%s\n", msg.c_str());
-    abort();
+    _VSTD::abort();
 #endif
 }
 

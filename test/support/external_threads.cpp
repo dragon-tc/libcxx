@@ -6,19 +6,5 @@
 // Source Licenses. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-
-// test forward
-
-#include <utility>
-
-struct A
-{
-};
-
-A source() {return A();}
-const A csource() {return A();}
-
-int main()
-{
-    std::forward<A&>(csource());  // error
-}
+#define _LIBCPP_BUILDING_EXTERNAL_THREADS
+#include <__threading_support>

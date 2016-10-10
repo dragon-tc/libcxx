@@ -7,18 +7,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// test forward
+// <ctgmath>
 
-#include <utility>
+#include <ctgmath>
 
-struct A
-{
-};
-
-A source() {return A();}
-const A csource() {return A();}
+#ifndef _LIBCPP_VERSION
+#error _LIBCPP_VERSION not defined
+#endif
 
 int main()
 {
-    std::forward<A&>(source());  // error
+    std::complex<double> cd;
+    double x = std::sin(0);
 }

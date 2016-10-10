@@ -7,16 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-// test forward
+// <ccomplex>
 
-#include <utility>
+#include <ccomplex>
 
-struct A
-{
-};
+#ifndef _LIBCPP_VERSION
+#error _LIBCPP_VERSION not defined
+#endif
 
 int main()
 {
-    A a;
-    std::forward(a);  // error
+    std::complex<double> d;
 }
