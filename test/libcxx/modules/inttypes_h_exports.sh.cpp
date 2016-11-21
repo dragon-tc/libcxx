@@ -7,26 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <iterator>
+// REQUIRES: modules-support
 
-// class istream_iterator
+// Test that intypes.h re-exports stdint.h
 
-// constexpr istream_iterator();
+// RUN: %build_module
 
-#include <iterator>
-#include <cassert>
+#include <inttypes.h>
 
-#include "test_macros.h"
-
-int main()
-{
-    {
-    typedef std::istream_iterator<int> T;
-    T it;
-    assert(it == T());
-#if TEST_STD_VER >= 11
-    constexpr T it2;
-#endif
-    }
-
+int main() {
+  int8_t x; ((void)x);
 }

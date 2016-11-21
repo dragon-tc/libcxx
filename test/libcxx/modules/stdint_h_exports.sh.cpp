@@ -7,26 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <iterator>
+// REQUIRES: modules-support
 
-// class istream_iterator
+// Test that int8_t and the like are exported from stdint.h not inttypes.h
 
-// constexpr istream_iterator();
+// RUN: %build_module
 
-#include <iterator>
-#include <cassert>
+#include <stdint.h>
 
-#include "test_macros.h"
-
-int main()
-{
-    {
-    typedef std::istream_iterator<int> T;
-    T it;
-    assert(it == T());
-#if TEST_STD_VER >= 11
-    constexpr T it2;
-#endif
-    }
-
+int main() {
+  int8_t x; ((void)x);
 }

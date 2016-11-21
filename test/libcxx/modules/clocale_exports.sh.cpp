@@ -7,26 +7,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <iterator>
+// REQUIRES: modules-support
+// UNSUPPORTED: c++98, c++03
 
-// class istream_iterator
+// RUN: %build_module
 
-// constexpr istream_iterator();
+#include <clocale>
 
-#include <iterator>
-#include <cassert>
+#define TEST(...) do { using T = decltype( __VA_ARGS__ ); } while(false)
 
-#include "test_macros.h"
+int main() {
+  std::lconv l; ((void)l);
 
-int main()
-{
-    {
-    typedef std::istream_iterator<int> T;
-    T it;
-    assert(it == T());
-#if TEST_STD_VER >= 11
-    constexpr T it2;
-#endif
-    }
-
+  TEST(std::setlocale(0, ""));
+  TEST(std::localeconv());
 }

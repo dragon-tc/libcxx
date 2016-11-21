@@ -7,26 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <iterator>
+// <locale.h>
 
-// class istream_iterator
+#include <locale.h>
 
-// constexpr istream_iterator();
-
-#include <iterator>
-#include <cassert>
-
-#include "test_macros.h"
+#ifndef _LIBCPP_VERSION
+#error _LIBCPP_VERSION not defined
+#endif
 
 int main()
 {
-    {
-    typedef std::istream_iterator<int> T;
-    T it;
-    assert(it == T());
-#if TEST_STD_VER >= 11
-    constexpr T it2;
-#endif
-    }
-
 }
