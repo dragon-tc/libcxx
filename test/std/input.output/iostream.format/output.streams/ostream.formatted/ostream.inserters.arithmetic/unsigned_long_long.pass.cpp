@@ -38,7 +38,7 @@ protected:
         {
             if (__c != base::traits_type::eof())
             {
-                int n = str_.size();
+                int n = static_cast<int>(str_.size());
                 str_.push_back(__c);
                 str_.resize(str_.capacity());
                 base::setp(const_cast<CharT*>(str_.data()),
@@ -76,7 +76,7 @@ int main()
         testbuf<char> sb;
         std::ostream os(&sb);
         hex(os);
-        unsigned long long n = -10;
+        unsigned long long n = static_cast<unsigned long long>(-10);
         os << n;
         assert(sb.str() == "fffffffffffffff6");
     }

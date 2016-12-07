@@ -65,7 +65,6 @@ class Configuration(object):
         self.cxx_library_root = None
         self.cxx_runtime_root = None
         self.abi_library_root = None
-        self.module_cache_path = None
         self.env = {}
         self.use_target = False
         self.use_system_cxx_lib = False
@@ -127,6 +126,9 @@ class Configuration(object):
         # Print the final compile and link flags.
         self.lit_config.note('Using compiler: %s' % self.cxx.path)
         self.lit_config.note('Using flags: %s' % self.cxx.flags)
+        if self.cxx.use_modules:
+            self.lit_config.note('Using modules flags: %s' %
+                                 self.cxx.modules_flags)
         self.lit_config.note('Using compile flags: %s'
                              % self.cxx.compile_flags)
         if len(self.cxx.warning_flags):
@@ -232,6 +234,7 @@ class Configuration(object):
             self.lit_config.fatal(
                 'unsupported value for "cxx_stdlib_under_test": %s'
                 % self.cxx_stdlib_under_test)
+        self.config.available_features.add(self.cxx_stdlib_under_test)
         if self.cxx_stdlib_under_test == 'libstdc++':
             self.config.available_features.add('libstdc++')
             # Manually enable the experimental and filesystem tests for libstdc++
@@ -248,8 +251,9 @@ class Configuration(object):
         if self.use_clang_verify is None:
             # NOTE: We do not test for the -verify flag directly because
             #   -verify will always exit with non-zero on an empty file.
-            self.use_clang_verify = self.cxx.hasCompileFlag(
-                ['-Xclang', '-verify-ignore-unexpected'])
+            self.use_clang_verify = self.cxx.isVerifySupported()
+            if self.use_clang_verify:
+                self.config.available_features.add('verify-support')
             self.lit_config.note(
                 "inferred use_clang_verify as: %r" % self.use_clang_verify)
 
@@ -632,14 +636,18 @@ class Configuration(object):
         self.cxx.compile_flags += ['-D_LIBCPP_DEBUG=%s' % debug_level]
 
     def configure_warnings(self):
-        enable_warnings = self.get_lit_bool('enable_warnings', False)
+        # Turn on warnings by default for Clang based compilers when C++ >= 11
+        default_enable_warnings = self.cxx.type in ['clang', 'apple-clang'] \
+            and len(self.config.available_features.intersection(
+                ['c++11', 'c++14', 'c++1z'])) != 0
+        enable_warnings = self.get_lit_bool('enable_warnings',
+                                            default_enable_warnings)
         if enable_warnings:
             self.cxx.warning_flags += [
                 '-D_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER',
                 '-Wall', '-Wextra', '-Werror'
             ]
-            # FIXME turn this back on after fixing potential breakage.
-            #self.cxx.addWarningFlagIfSupported('-Wshadow')
+            self.cxx.addWarningFlagIfSupported('-Wshadow')
             self.cxx.addWarningFlagIfSupported('-Wno-unused-command-line-argument')
             self.cxx.addWarningFlagIfSupported('-Wno-attributes')
             self.cxx.addWarningFlagIfSupported('-Wno-pessimizing-move')
@@ -647,10 +655,10 @@ class Configuration(object):
             self.cxx.addWarningFlagIfSupported('-Wno-user-defined-literals')
             # TODO(EricWF) Remove the unused warnings once the test suite
             # compiles clean with them.
+            self.cxx.addWarningFlagIfSupported('-Wno-sign-compare')
             self.cxx.addWarningFlagIfSupported('-Wno-unused-local-typedef')
             self.cxx.addWarningFlagIfSupported('-Wno-unused-variable')
             self.cxx.addWarningFlagIfSupported('-Wno-unused-parameter')
-            self.cxx.addWarningFlagIfSupported('-Wno-sign-compare')
             std = self.get_lit_conf('std', None)
             if std in ['c++98', 'c++03']:
                 # The '#define static_assert' provided by libc++ in C++03 mode
@@ -725,8 +733,14 @@ class Configuration(object):
             self.cxx.compile_flags += ['-O0']
 
     def configure_modules(self):
-        supports_modules = self.cxx.hasCompileFlag('-fmodules')
-        enable_modules = self.get_lit_bool('enable_modules', False)
+        modules_flags = ['-fmodules']
+        if platform.system() != 'Darwin':
+            modules_flags += ['-Xclang', '-fmodules-local-submodule-visibility']
+        supports_modules = self.cxx.hasCompileFlag(modules_flags)
+        enable_modules_default = supports_modules and \
+            os.environ.get('LIBCXX_USE_MODULES') is not None
+        enable_modules = self.get_lit_bool('enable_modules',
+                                           enable_modules_default)
         if enable_modules and not supports_modules:
             self.lit_config.fatal(
                 '-fmodules is enabled but not supported by the compiler')
@@ -739,11 +753,11 @@ class Configuration(object):
         if os.path.isdir(module_cache):
             shutil.rmtree(module_cache)
         os.makedirs(module_cache)
-        self.module_cache_path = module_cache
+        self.cxx.modules_flags = modules_flags + \
+            ['-fmodules-cache-path=' + module_cache]
         if enable_modules:
             self.config.available_features.add('-fmodules')
-            self.cxx.compile_flags += ['-fmodules',
-                                       '-fmodules-cache-path=' + module_cache]
+            self.cxx.useModules()
 
     def configure_substitutions(self):
         sub = self.config.substitutions
@@ -758,24 +772,25 @@ class Configuration(object):
         sub.append(('%compile_flags', compile_flags_str))
         sub.append(('%link_flags', link_flags_str))
         sub.append(('%all_flags', all_flags))
-
-        module_flags = None
-        if not self.module_cache_path is None:
-            module_flags = '-fmodules -fmodules-cache-path=' \
-                           + self.module_cache_path + ' '
-
-
+        if self.cxx.isVerifySupported():
+            verify_str = ' ' + ' '.join(self.cxx.verify_flags) + ' '
+            sub.append(('%verify', verify_str))
         # Add compile and link shortcuts
         compile_str = (self.cxx.path + ' -o %t.o %s -c ' + flags_str
-                       + compile_flags_str)
-        link_str = (self.cxx.path + ' -o %t.exe %t.o ' + flags_str
+                       + ' ' + compile_flags_str)
+        link_str = (self.cxx.path + ' -o %t.exe %t.o ' + flags_str + ' '
                     + link_flags_str)
         assert type(link_str) is str
         build_str = self.cxx.path + ' -o %t.exe %s ' + all_flags
+        if self.cxx.use_modules:
+            sub.append(('%compile_module', compile_str))
+            sub.append(('%build_module', build_str))
+        elif self.cxx.modules_flags is not None:
+            modules_str = ' '.join(self.cxx.modules_flags) + ' '
+            sub.append(('%compile_module', compile_str + ' ' + modules_str))
+            sub.append(('%build_module', build_str + ' ' + modules_str))
         sub.append(('%compile', compile_str))
         sub.append(('%link', link_str))
-        if not module_flags is None:
-            sub.append(('%build_module', build_str + ' ' + module_flags))
         sub.append(('%build', build_str))
         # Configure exec prefix substitutions.
         exec_env_str = 'env ' if len(self.env) != 0 else ''
@@ -788,10 +803,10 @@ class Configuration(object):
         sub.append(('%exec', exec_str))
         # Configure run shortcut
         sub.append(('%run', exec_str + ' %t.exe'))
-        # Configure not program substitions
+        # Configure not program substitutions
         not_py = os.path.join(self.libcxx_src_root, 'utils', 'not', 'not.py')
-        not_str = '%s %s' % (sys.executable, not_py)
-        sub.append(('not', not_str))
+        not_str = '%s %s ' % (sys.executable, not_py)
+        sub.append(('not ', not_str))
 
     def configure_triple(self):
         # Get or infer the target triple.
