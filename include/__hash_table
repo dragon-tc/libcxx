@@ -133,12 +133,12 @@ __next_hash_pow2(size_t __n)
 
 template <class _Tp, class _Hash, class _Equal, class _Alloc> class __hash_table;
 
-template <class _NodePtr>      class _LIBCPP_TYPE_VIS_ONLY __hash_iterator;
-template <class _ConstNodePtr> class _LIBCPP_TYPE_VIS_ONLY __hash_const_iterator;
-template <class _NodePtr>      class _LIBCPP_TYPE_VIS_ONLY __hash_local_iterator;
-template <class _ConstNodePtr> class _LIBCPP_TYPE_VIS_ONLY __hash_const_local_iterator;
-template <class _HashIterator> class _LIBCPP_TYPE_VIS_ONLY __hash_map_iterator;
-template <class _HashIterator> class _LIBCPP_TYPE_VIS_ONLY __hash_map_const_iterator;
+template <class _NodePtr>      class _LIBCPP_TEMPLATE_VIS __hash_iterator;
+template <class _ConstNodePtr> class _LIBCPP_TEMPLATE_VIS __hash_const_iterator;
+template <class _NodePtr>      class _LIBCPP_TEMPLATE_VIS __hash_local_iterator;
+template <class _ConstNodePtr> class _LIBCPP_TEMPLATE_VIS __hash_const_local_iterator;
+template <class _HashIterator> class _LIBCPP_TEMPLATE_VIS __hash_map_iterator;
+template <class _HashIterator> class _LIBCPP_TEMPLATE_VIS __hash_map_const_iterator;
 
 template <class _Tp>
 struct __hash_key_value_types {
@@ -285,7 +285,7 @@ struct __make_hash_node_types {
 };
 
 template <class _NodePtr>
-class _LIBCPP_TYPE_VIS_ONLY __hash_iterator
+class _LIBCPP_TEMPLATE_VIS __hash_iterator
 {
     typedef __hash_node_types<_NodePtr> _NodeTypes;
     typedef _NodePtr                            __node_pointer;
@@ -384,14 +384,14 @@ private:
         {}
 #endif
     template <class, class, class, class> friend class __hash_table;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_const_iterator;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_map_iterator;
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_map;
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_multimap;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_const_iterator;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_map_iterator;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_map;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_multimap;
 };
 
 template <class _NodePtr>
-class _LIBCPP_TYPE_VIS_ONLY __hash_const_iterator
+class _LIBCPP_TEMPLATE_VIS __hash_const_iterator
 {
     static_assert(!is_const<typename pointer_traits<_NodePtr>::element_type>::value, "");
     typedef __hash_node_types<_NodePtr> _NodeTypes;
@@ -500,13 +500,13 @@ private:
         {}
 #endif
     template <class, class, class, class> friend class __hash_table;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_map_const_iterator;
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_map;
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_multimap;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_map_const_iterator;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_map;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_multimap;
 };
 
 template <class _NodePtr>
-class _LIBCPP_TYPE_VIS_ONLY __hash_local_iterator
+class _LIBCPP_TEMPLATE_VIS __hash_local_iterator
 {
     typedef __hash_node_types<_NodePtr> _NodeTypes;
     typedef _NodePtr                            __node_pointer;
@@ -624,12 +624,12 @@ private:
         }
 #endif
     template <class, class, class, class> friend class __hash_table;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_const_local_iterator;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_map_iterator;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_const_local_iterator;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_map_iterator;
 };
 
 template <class _ConstNodePtr>
-class _LIBCPP_TYPE_VIS_ONLY __hash_const_local_iterator
+class _LIBCPP_TEMPLATE_VIS __hash_const_local_iterator
 {
     typedef __hash_node_types<_ConstNodePtr> _NodeTypes;
     typedef _ConstNodePtr                       __node_pointer;
@@ -765,7 +765,7 @@ private:
         }
 #endif
     template <class, class, class, class> friend class __hash_table;
-    template <class> friend class _LIBCPP_TYPE_VIS_ONLY __hash_map_const_iterator;
+    template <class> friend class _LIBCPP_TEMPLATE_VIS __hash_map_const_iterator;
 };
 
 template <class _Alloc>
@@ -1181,7 +1181,7 @@ public:
 
     void swap(__hash_table& __u)
 #if _LIBCPP_STD_VER <= 11
-        _NOEXCEPT_(
+        _NOEXCEPT_DEBUG_(
             __is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value
             && (!allocator_traits<__pointer_allocator>::propagate_on_container_swap::value
                   || __is_nothrow_swappable<__pointer_allocator>::value)
@@ -1189,7 +1189,7 @@ public:
                   || __is_nothrow_swappable<__node_allocator>::value)
             );
 #else
-     _NOEXCEPT_(__is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value);
+     _NOEXCEPT_DEBUG_(__is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value);
 #endif
 
     _LIBCPP_INLINE_VISIBILITY
@@ -1324,8 +1324,8 @@ private:
     void __deallocate(__next_pointer __np) _NOEXCEPT;
     __next_pointer __detach() _NOEXCEPT;
 
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_map;
-    template <class, class, class, class, class> friend class _LIBCPP_TYPE_VIS_ONLY unordered_multimap;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_map;
+    template <class, class, class, class, class> friend class _LIBCPP_TEMPLATE_VIS unordered_multimap;
 };
 
 template <class _Tp, class _Hash, class _Equal, class _Alloc>
@@ -2408,15 +2408,15 @@ __hash_table<_Tp, _Hash, _Equal, _Alloc>::remove(const_iterator __p) _NOEXCEPT
     --size();
 #if _LIBCPP_DEBUG_LEVEL >= 2
     __c_node* __c = __get_db()->__find_c_and_lock(this);
-    for (__i_node** __p = __c->end_; __p != __c->beg_; )
+    for (__i_node** __dp = __c->end_; __dp != __c->beg_; )
     {
-        --__p;
-        iterator* __i = static_cast<iterator*>((*__p)->__i_);
+        --__dp;
+        iterator* __i = static_cast<iterator*>((*__dp)->__i_);
         if (__i->__node_ == __cn)
         {
-            (*__p)->__c_ = nullptr;
-            if (--__c->end_ != __p)
-                memmove(__p, __p+1, (__c->end_ - __p)*sizeof(__i_node*));
+            (*__dp)->__c_ = nullptr;
+            if (--__c->end_ != __dp)
+                memmove(__dp, __dp+1, (__c->end_ - __dp)*sizeof(__i_node*));
         }
     }
     __get_db()->unlock();
@@ -2524,7 +2524,7 @@ template <class _Tp, class _Hash, class _Equal, class _Alloc>
 void
 __hash_table<_Tp, _Hash, _Equal, _Alloc>::swap(__hash_table& __u)
 #if _LIBCPP_STD_VER <= 11
-    _NOEXCEPT_(
+    _NOEXCEPT_DEBUG_(
         __is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value
         && (!allocator_traits<__pointer_allocator>::propagate_on_container_swap::value
               || __is_nothrow_swappable<__pointer_allocator>::value)
@@ -2532,9 +2532,13 @@ __hash_table<_Tp, _Hash, _Equal, _Alloc>::swap(__hash_table& __u)
               || __is_nothrow_swappable<__node_allocator>::value)
             )
 #else
-  _NOEXCEPT_(__is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value)
+  _NOEXCEPT_DEBUG_(__is_nothrow_swappable<hasher>::value && __is_nothrow_swappable<key_equal>::value)
 #endif
 {
+    _LIBCPP_ASSERT(__node_traits::propagate_on_container_swap::value ||
+                   this->__node_alloc() == __u.__node_alloc(),
+                   "list::swap: Either propagate_on_container_swap must be true"
+                   " or the allocators must compare equal");
     {
     __node_pointer_pointer __npp = __bucket_list_.release();
     __bucket_list_.reset(__u.__bucket_list_.release());
