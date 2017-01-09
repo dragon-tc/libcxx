@@ -30,8 +30,8 @@
 // No _LIBCPP_ELAST needed on Apple
 #elif defined(__sun__)
 #define _LIBCPP_ELAST ESTALE
-#elif defined(_LIBCPP_MSCVRT)
-#define _LIBCPP_ELAST _sys_nerr
+#elif defined(_LIBCPP_MSVCRT)
+#define _LIBCPP_ELAST (_sys_nerr - 1)
 #else
 // Warn here so that the person doing the libcxx port has an easier time:
 #warning ELAST for this platform not yet implemented
