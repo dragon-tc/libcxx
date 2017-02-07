@@ -7,24 +7,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// XFAIL: c++98, c++03
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-W#warnings"
+#endif
 
-// <system_error>
+#define min THIS IS A NASTY MACRO!
+#define max THIS IS A NASTY MACRO!
 
-// class error_code
+#include <map>
 
-// explicit operator bool() const;
-
-#include <system_error>
-
-bool test_func(void)
-{
-    const std::error_code ec(0, std::generic_category());
-    return ec;   // conversion to bool is explicit; should fail.
+int main() {
+  std::map<int, int> m;
+  ((void)m);
 }
-
-int main()
-{
-    return 0;
-}
-
