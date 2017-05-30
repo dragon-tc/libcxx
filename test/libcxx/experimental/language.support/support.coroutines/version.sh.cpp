@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -7,9 +8,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstdio>
+// UNSUPPORTED: c++98, c++03, c++11
+// REQUIRES: fcoroutines-ts
 
-int main() {
-    // rename is not available on systems without a global filesystem namespace.
-    std::rename("", "");
+// RUN: %build -fcoroutines-ts
+// RUN: %run
+
+#include <experimental/coroutine>
+
+#ifndef _LIBCPP_VERSION
+#error _LIBCPP_VERSION must be defined
+#endif
+
+int main()
+{
 }

@@ -7,22 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <iterator>
+// REQUIRES: libcpp-has-no-global-filesystem-namespace
 
-// istreambuf_iterator
+#include <cstdio>
 
-// pointer operator->() const;
-
-#include <iostream>
-#include <sstream>
-#include <streambuf>
-
-typedef char C;
-int main ()
-{
-   std::istringstream s("filename");
-   std::istreambuf_iterator<char> i(s);
-
-   (*i).~C();  // This is well-formed...
-   i->~C();  // ... so this should be supported!
+int main() {
+    // rename is not available on systems without a global filesystem namespace.
+    std::rename("", "");
 }

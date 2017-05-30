@@ -142,6 +142,7 @@ class Configuration(object):
         self.configure_sanitizer()
         self.configure_coverage()
         self.configure_modules()
+        self.configure_coroutines()
         self.configure_substitutions()
         self.configure_features()
 
@@ -465,6 +466,12 @@ class Configuration(object):
             self.config.available_features.add('glibc')
             self.config.available_features.add('glibc-%s' % maj_v)
             self.config.available_features.add('glibc-%s.%s' % (maj_v, min_v))
+
+        # Support Objective-C++ only on MacOS and if the compiler supports it.
+        if self.target_info.platform() == "darwin" and \
+           self.target_info.is_host_macosx() and \
+           self.cxx.hasCompileFlag(["-x", "objective-c++", "-fobjc-arc"]):
+            self.config.available_features.add("objective-c++")
 
     def configure_compile_flags(self):
         no_default_flags = self.get_lit_bool('no_default_flags', False)
@@ -872,6 +879,9 @@ class Configuration(object):
         # FIXME: Enable the two warnings below.
         self.cxx.addWarningFlagIfSupported('-Wno-conversion')
         self.cxx.addWarningFlagIfSupported('-Wno-unused-local-typedef')
+        # FIXME: Remove this warning once the min/max handling patch lands
+        # See https://reviews.llvm.org/D33080
+        self.cxx.addWarningFlagIfSupported('-Wno-#warnings')
         std = self.get_lit_conf('std', None)
         if std in ['c++98', 'c++03']:
             # The '#define static_assert' provided by libc++ in C++03 mode
@@ -945,6 +955,18 @@ class Configuration(object):
             self.cxx.flags += ['-g', '--coverage']
             self.cxx.compile_flags += ['-O0']
 
+    def configure_coroutines(self):
+        if self.cxx.hasCompileFlag('-fcoroutines-ts'):
+            macros = self.cxx.dumpMacros(flags=['-fcoroutines-ts'])
+            if '__cpp_coroutines' not in macros:
+                self.lit_config.warning('-fcoroutines-ts is supported but '
+                    '__cpp_coroutines is not defined')
+            # Consider coroutines supported only when the feature test macro
+            # reflects a recent value.
+            val = macros['__cpp_coroutines'].replace('L', '')
+            if int(val) >= 201703:
+                self.config.available_features.add('fcoroutines-ts')
+
     def configure_modules(self):
         modules_flags = ['-fmodules']
         if platform.system() != 'Darwin':
@@ -1006,18 +1028,8 @@ class Configuration(object):
         sub.append(('%link', link_str))
         sub.append(('%build', build_str))
         # Configure exec prefix substitutions.
-        exec_env_str = ''
-        if not self.is_windows and len(self.exec_env) != 0:
-            exec_env_str = 'env '
-            for k, v in self.exec_env.items():
-                exec_env_str += ' %s=%s' % (k, v)
         # Configure run env substitution.
-        exec_str = exec_env_str
-        if self.lit_config.useValgrind:
-            exec_str = ' '.join(self.lit_config.valgrindArgs) + exec_env_str
-        sub.append(('%exec', exec_str))
-        # Configure run shortcut
-        sub.append(('%run', exec_str + ' %t.exe'))
+        sub.append(('%run', '%t.exe'))
         # Configure not program substitutions
         not_py = os.path.join(self.libcxx_src_root, 'utils', 'not.py')
         not_str = '%s %s ' % (pipes.quote(sys.executable), pipes.quote(not_py))
