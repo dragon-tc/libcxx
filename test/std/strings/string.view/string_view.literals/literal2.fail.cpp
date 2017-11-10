@@ -1,3 +1,4 @@
+// -*- C++ -*-
 //===----------------------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -7,27 +8,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <list>
+// UNSUPPORTED: c++98, c++03, c++11
+// UNSUPPORTED: clang-3.3, clang-3.4, clang-3.5, clang-3.6, clang-3.7, clang-3.8, clang-3.9
+// UNSUPPORTED: apple-clang-6, apple-clang-7, apple-clang-8
 
-// Decrement iterator prior to begin.
-
-#define _LIBCPP_DEBUG 1
-#define _LIBCPP_ASSERT(x, m) ((x) ? (void)0 : std::exit(0))
-
-#include <list>
+#include <string_view>
 #include <cassert>
-#include <iterator>
-#include <exception>
-#include <cstdlib>
 
 int main()
 {
-    typedef int T;
-    typedef std::list<T> C;
-    C c(1);
-    C::iterator i = c.end();
-    --i;
-    assert(i == c.begin());
-    --i;
-    assert(false);
+    std::string_view foo  =   ""sv;  // should fail w/conversion operator not found
 }

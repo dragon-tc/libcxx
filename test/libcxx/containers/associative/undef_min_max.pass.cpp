@@ -7,24 +7,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <list>
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-W#warnings"
+#endif
 
-// Call front() on empty const container.
+#define min THIS IS A NASTY MACRO!
+#define max THIS IS A NASTY MACRO!
 
-#define _LIBCPP_DEBUG 1
-#define _LIBCPP_ASSERT(x, m) ((x) ? (void)0 : std::exit(0))
+#include <map>
 
-#include <list>
-#include <cassert>
-#include <iterator>
-#include <exception>
-#include <cstdlib>
-
-int main()
-{
-    typedef int T;
-    typedef std::list<T> C;
-    const C c;
-    assert(c.front() == 0);
-    assert(false);
+int main() {
+  std::map<int, int> m;
+  ((void)m);
 }
